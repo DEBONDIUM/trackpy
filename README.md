@@ -48,30 +48,28 @@ trackpy/
 
 from trackpy import Sequence, Tracker
 
-if __name__ == "__main__":
-    # 1. Create sequence
-    seq = Sequence("img_JT/test_1")
-    seq.load_all()
+# 1. Create sequence
+seq = Sequence("img_exp")
+seq.load_all()
 
-    # 2. Create tracker (interactive threshold tuning)
-    tracker = Tracker(seq, _threshold=70)
+# 2. Create tracker (interactive threshold tuning)
+tracker = Tracker(seq, threshold=70)
 
-    # 3. Add targets (interactive click)
-    tracker.add_target()
-    tracker.add_target()  # optional second target
+# 3. Add target (interactive click)
+tracker.add_target()
 
-    # 4. Run tracking
-    tracker.run()
+# 4. Run tracking
+tracker.run()
 
-    # 5. Display results
-    tracker.display_tracking(save_dir="img_JT/test_1/resultats/frames")
+# 5. Display results
+tracker.display_tracking(save_dir="res")
 
-    # 6. Plot trajectory
-    target = tracker.targets[0]
-    target.display_center_tracking()
+# 6. Plot trajectory
+target = tracker.targets[0]
+target.display_center_tracking()
 
-    # 7. Export trajectories
-    seq.export_all("img_JT/test_1/resultats/txt", tracker.targets)
+# 7. Export trajectories
+seq.export_all("res", tracker.targets)
 
 ---
 
