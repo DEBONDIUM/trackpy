@@ -21,15 +21,22 @@ The tracker detects contours in binarized images and follows object centers acro
 
 Clone the repository:
 
+```bash
 git clone https://github.com/DEBONDIUM/trackpy.git
 cd trackpy
+```
 
 Install the package:
 
+```bash
 pip install .
+```
 
 For development (optional):
+
+```bash
 pip install -e .
+```
 
 ---
 
@@ -46,6 +53,7 @@ trackpy/
 
 ## 🚀 Quick example
 
+```python
 from trackpy import Sequence, Tracker
 
 # 1. Create sequence
@@ -70,6 +78,7 @@ target.display_center_tracking()
 
 # 7. Export trajectories
 seq.export_all("res", tracker.targets)
+```
 
 ---
 
@@ -100,7 +109,9 @@ Tracking visualization:
 - Annotated frames (optional)
 - Trajectory files (.txt) with:
 
+```
 frame_idx    center_x    center_y
+```
 
 - Center evolution plots
 
@@ -125,7 +136,7 @@ frame_idx    center_x    center_y
 
 ---
 
-## 📌 Notes
+## 🃑 Notes
 
 - Works best with:
   - high contrast images
@@ -143,3 +154,4 @@ MIT License
 ## 👤 Author
 
 Luc Brémaud, Jérémie Girardot, Vincent Fournier
+
