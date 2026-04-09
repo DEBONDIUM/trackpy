@@ -349,7 +349,8 @@ class Tracker:
         """
         Display each annotated frame in a fixed-size window (_WIN_W x _WIN_H).
         Image is scaled to fit while preserving aspect ratio, with black padding.
-
+        If _save_dir is provided, ALL frames are saved before display opens.
+    
         Navigation:
           right arrow : next frame
           left arrow  : previous frame
@@ -357,47 +358,103 @@ class Tracker:
           q           : quit
         Closing the window raises InterruptedError.
         """
+        images = self._sequence.images
+        total  = len(images)
+    
+        # --- Save all frames first, independently of navigation ---
         if save_dir:
             os.makedirs(save_dir, exist_ok=True)
-
-        images = self._sequence.images
-        total = len(images)
+            print(f"[Tracker] Saving {total} frames to {save_dir} ...")
+            for img_obj in images:
+                annotated = img_obj.draw(self._targets)
+                out_path  = os.path.join(save_dir, f"frame_{img_obj.frame_idx:04d}.png")
+                cv2.imwrite(out_path, annotated)
+            print(f"[Tracker] {total} frames saved.")
+    
+        # --- Interactive display ---
         idx = 0
-
         cv2.namedWindow("Tracker", cv2.WINDOW_NORMAL)
         cv2.resizeWindow("Tracker", self._WIN_W, self._WIN_H)
-
+    
         while True:
-            img_obj = images[idx]
+            img_obj   = images[idx]
             annotated = img_obj.draw(self._targets)
-
-            if save_dir:
-                out_path = os.path.join(save_dir, f"frame_{img_obj.frame_idx:04d}.png")
-                cv2.imwrite(out_path, annotated)
-
-            display = self._make_display_frame(annotated, idx, total, img_obj.frame_idx)
+            display   = self._make_display_frame(annotated, idx, total, img_obj.frame_idx)
             cv2.imshow("Tracker", display)
-
+    
             key = cv2.waitKey(0)
-
+    
             # Check if window was closed by user
             try:
                 if cv2.getWindowProperty("Tracker", cv2.WND_PROP_VISIBLE) < 1:
                     raise InterruptedError("Tracking aborted by user (window closed).")
             except cv2.error:
                 raise InterruptedError("Tracking aborted by user (window closed).")
-
+    
             if key == ord("q"):
                 break
-            elif key in [83, 2555904]:  # next frame
+            elif key in [83, 2555904]:   # right arrow → next frame
                 idx = (idx + 1) % total
-            elif key in [81, 2424832]:  # previous frame
+            elif key in [81, 2424832]:   # left arrow  → previous frame
                 idx = (idx - 1) % total
-            elif key == ord("r"):  # reset to first frame
+            elif key == ord("r"):        # r           → reset to first frame
                 idx = 0
-
+    
         cv2.destroyAllWindows()
         cv2.waitKey(1)
+    # def display_tracking(self, save_dir: Optional[str] = None):
+    #     """
+    #     Display each annotated frame in a fixed-size window (_WIN_W x _WIN_H).
+    #     Image is scaled to fit while preserving aspect ratio, with black padding.
+
+    #     Navigation:
+    #       right arrow : next frame
+    #       left arrow  : previous frame
+    #       r           : reset to first frame
+    #       q           : quit
+    #     Closing the window raises InterruptedError.
+    #     """
+    #     if save_dir:
+    #         os.makedirs(save_dir, exist_ok=True)
+
+    #     images = self._sequence.images
+    #     total = len(images)
+    #     idx = 0
+
+    #     cv2.namedWindow("Tracker", cv2.WINDOW_NORMAL)
+    #     cv2.resizeWindow("Tracker", self._WIN_W, self._WIN_H)
+
+    #     while True:
+    #         img_obj = images[idx]
+    #         annotated = img_obj.draw(self._targets)
+
+    #         if save_dir:
+    #             out_path = os.path.join(save_dir, f"frame_{img_obj.frame_idx:04d}.png")
+    #             cv2.imwrite(out_path, annotated)
+
+    #         display = self._make_display_frame(annotated, idx, total, img_obj.frame_idx)
+    #         cv2.imshow("Tracker", display)
+
+    #         key = cv2.waitKey(0)
+
+    #         # Check if window was closed by user
+    #         try:
+    #             if cv2.getWindowProperty("Tracker", cv2.WND_PROP_VISIBLE) < 1:
+    #                 raise InterruptedError("Tracking aborted by user (window closed).")
+    #         except cv2.error:
+    #             raise InterruptedError("Tracking aborted by user (window closed).")
+
+    #         if key == ord("q"):
+    #             break
+    #         elif key in [83, 2555904]:  # next frame
+    #             idx = (idx + 1) % total
+    #         elif key in [81, 2424832]:  # previous frame
+    #             idx = (idx - 1) % total
+    #         elif key == ord("r"):  # reset to first frame
+    #             idx = 0
+
+    #     cv2.destroyAllWindows()
+    #     cv2.waitKey(1)
 
     def __repr__(self):
         return (
