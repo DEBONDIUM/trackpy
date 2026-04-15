@@ -40,16 +40,6 @@ pip install -e .
 
 ---
 
-## 📁 Project structure
-
-trackpy/
-├── trackpy/        # core package
-├── examples/       # usage examples
-├── README.md
-├── setup.py
-└── LICENSE
-
----
 
 ## 🚀 Quick example
 
