@@ -51,7 +51,7 @@ seq = Sequence("img_exp")
 seq.load_all()
 
 # 2. Create tracker (interactive threshold tuning)
-tracker = Tracker(seq, threshold=70)
+tracker = Tracker(seq)
 
 # 3. Add target (interactive click)
 tracker.add_target()
@@ -67,7 +67,7 @@ target = tracker.targets[0]
 target.display_center_tracking()
 
 # 7. Export trajectories
-seq.export_all("res", tracker.targets)
+tracker.export_trajectories(save_dir="res/txt", targets=tracker.targets)
 ```
 
 ---
