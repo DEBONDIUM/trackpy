@@ -12,7 +12,7 @@ seq.load_all()
 # =============================================================================
 # Create tracker
 # =============================================================================
-tracker = Tracker(seq, threshold=70)
+tracker = Tracker(seq)
 
 # =============================================================================
 # Add target
@@ -33,13 +33,12 @@ tracker.display_tracking(save_dir="res/frames")
 # =============================================================================
 # Plot center tracking
 # =============================================================================
-target0 = tracker.targets[0]
-target0.display_center_tracking(save_dir="res")
-
-target1 = tracker.targets[1]
-target1.display_center_tracking(save_dir="res")
+for target in tracker.targets:
+    target.display_center_tracking(save_dir="res")
 
 # =============================================================================
 # Export target trajectory
 # =============================================================================
-seq.export_all(save_dir="res/txt", targets=tracker.targets)
+tracker.export_trajectories(save_dir="res/txt", targets=tracker.targets)
+
+

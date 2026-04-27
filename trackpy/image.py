@@ -2,10 +2,11 @@
 # Libraries
 # =============================================================================
 import numpy as np
-import os
 import cv2
-from typing import Optional
+from pathlib import Path
+
 from .target import Target
+# from target import Target
 
 
 # =============================================================================
@@ -13,22 +14,20 @@ from .target import Target
 # =============================================================================
 class Image:
     """
-    Represents a single frame with its processing pipeline:
-    loading, binarization, contour detection, and per-target results.
+    Represents a single frame identified by its path.
+
+    Design choice: images are NOT kept in memory between calls.
+    Each method that needs pixel data reads from disk on the fly,
+    processes, and discards — suitable for large high-resolution sequences.
     """
 
-    def __init__(self, _path: str, _frame_idx: int):
-        self._path = _path
-        self._frame_idx = _frame_idx
-        self._img_gray = None
-        self._img_color = None
-        self._thresh = None
-        self._contours = None
-        self._results = {}  # dict: target_id -> {"contour", "center_x", "center_y"}
+    def __init__(self, path: Path, frame_idx: int):
+        self._path = Path(path)
+        self._frame_idx = frame_idx
 
     # --- Properties ---
     @property
-    def path(self) -> str:
+    def path(self) -> Path:
         """Path to the image file."""
         return self._path
 
@@ -37,123 +36,78 @@ class Image:
         """Frame index in the sequence."""
         return self._frame_idx
 
-    @property
-    def img_gray(self) -> Optional[np.ndarray]:
-        """Grayscale image array."""
-        return self._img_gray
-
-    @property
-    def img_color(self) -> Optional[np.ndarray]:
-        """Color (BGR) image array."""
-        return self._img_color
-
-    @property
-    def thresh(self) -> Optional[np.ndarray]:
-        """Binarized image array."""
-        return self._thresh
-
-    @property
-    def contours(self):
-        """Detected contours."""
-        return self._contours
-
-    @property
-    def results(self) -> dict:
-        """Per-target results: {target_id: {contour, center_x, center_y}}."""
-        return self._results
-
-    # --- Methods ---
-    def load(self):
-        """Load image from disk."""
-        self._img_gray = cv2.imread(self._path, cv2.IMREAD_GRAYSCALE)
-        if self._img_gray is None:
+    # --- Private helpers ---
+    def _load_gray(self) -> np.ndarray:
+        """Read image from disk and return as grayscale array. Never stored."""
+        img = cv2.imread(str(self._path), cv2.IMREAD_GRAYSCALE)
+        if img is None:
             raise FileNotFoundError(f"Image not found : {self._path}")
-        self._img_color = cv2.cvtColor(self._img_gray, cv2.COLOR_GRAY2BGR)
+        return img
 
-    def binarize(self, _threshold: int = 70):
-        """Apply binary thresholding."""
-        _, self._thresh = cv2.threshold(
-            self._img_gray, _threshold, 255, cv2.THRESH_BINARY
-        )
-
-    def find_contours(self):
-        """Detect contours on the binarized image."""
-        self._contours, _ = cv2.findContours(
-            self._thresh, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE
-        )
-
-    def process_target(self, _target: Target) -> bool:
+    # --- Public methods ---
+    def process(self, threshold: int):
         """
-        Find the contour containing the target's current center,
-        compute the barycenter and store the result.
-        Returns True if found, False otherwise.
+        Detection step for a single frame.
+
+        Pipeline:
+        1. Load image from disk (grayscale)
+        2. Apply binary threshold
+        3. Extract contours
         """
-        px, py = _target.center
+        # Load grayscale image (discarded after function returns)
+        img_gray = self._load_gray()
 
-        # If target was lost on previous frame, skip processing
-        if px == -1 or py == -1:
-            print(
-                f"[Image {self._frame_idx}] Target {_target.id} was lost on previous frame, skipping."
-            )
-            return False
+        # Apply binary threshold
+        _, thresh = cv2.threshold(img_gray, threshold, 255, cv2.THRESH_BINARY)
 
-        for c in self._contours:
-            if cv2.pointPolygonTest(c, (float(px), float(py)), False) >= 0:
-                M = cv2.moments(c)
-                if M["m00"] != 0:
-                    center_x = int(M["m10"] / M["m00"])
-                    center_y = int(M["m01"] / M["m00"])
-                else:
-                    center_x, center_y = px, py  # fallback
+        # Detect contours
+        contours, _ = cv2.findContours(thresh, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
 
-                self._results[_target.id] = {
-                    "contour": c,
-                    "center_x": center_x,
-                    "center_y": center_y,
-                }
-                return True
+        return contours
 
-        print(
-            f"[Image {self._frame_idx}] Target {_target.id} not found near ({px}, {py})"
-        )
-        return False
-
-    def draw(self, _targets: list[Target]) -> np.ndarray:
+    def draw(self, targets: list[Target], frame_idx: int) -> np.ndarray:
         """
-        Draw on a copy of the color image:
-          - filled white region
-          - colored contour
+        Load the image from disk, draw annotations, and return the result.
+        Pixel data is not stored after this call.
+
+        Draws for each target (if found on this frame):
+          - filled white region inside the contour
+          - colored contour border
           - barycenter dot (target color)
-          - initial reference point (fixed across all frames)
-        Returns the annotated image.
+          - initial reference point (fixed teal dot)
         """
-        output = self._img_color.copy()
+        # Reload from disk for drawing — discarded after return
+        img_gray = self._load_gray()
+        img_color = cv2.cvtColor(img_gray, cv2.COLOR_GRAY2BGR)
 
-        for target in _targets:
-            if target.id not in self._results:
+        for target in targets:
+            # Find the result corresponding to this specific frame
+            result = next(
+                (
+                    (fi, c, cx, cy)
+                    for fi, c, cx, cy in target.results
+                    if fi == frame_idx
+                ),
+                None,
+            )
+
+            # Skip if no result for this frame or if target was lost
+            if result is None:
+                continue
+            _, contour, cx, cy = result
+            if cx == -1 or cy == -1 or contour is None:
                 continue
 
-            res = self._results[target.id]
-            contour = res["contour"]
-            center_x = res["center_x"]
-            center_y = res["center_y"]
             color = target.color
 
-            # Fill region in white
-            mask = np.zeros(self._img_gray.shape, dtype=np.uint8)
+            mask = np.zeros(img_gray.shape, dtype=np.uint8)
             cv2.fillPoly(mask, [contour], 255)
-            output[mask == 255] = (255, 255, 255)
+            img_color[mask == 255] = (255, 255, 255)
+            cv2.drawContours(img_color, [contour], -1, color, 2)
+            cv2.circle(img_color, (cx, cy), 6, color, -1)
+            cv2.circle(img_color, target.pointer, 4, (26, 153, 204), -1)
 
-            # Colored contour
-            cv2.drawContours(output, [contour], -1, color, 2)
-
-            # Barycenter dot (target color)
-            cv2.circle(output, (center_x, center_y), 6, color, -1)
-
-            # Initial reference point: fixed, never changes
-            cv2.circle(output, target.pointer, 4, (26, 153, 204), -1)
-
-        return output
+        return img_color
 
     def __repr__(self):
-        return f"Image(frame={self._frame_idx}, path={os.path.basename(self._path)})"
+        return f"Image(frame={self._frame_idx}, path={self._path.name})"

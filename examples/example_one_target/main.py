@@ -12,7 +12,7 @@ seq.load_all()
 # =============================================================================
 # Create tracker
 # =============================================================================
-tracker = Tracker(seq, threshold=70)
+tracker = Tracker(seq)
 
 # =============================================================================
 # Add target
@@ -38,4 +38,4 @@ target.display_center_tracking(save_dir="res")
 # =============================================================================
 # Export target trajectory
 # =============================================================================
-seq.export_all(save_dir="res/txt", targets=tracker.targets)
+tracker.export_trajectories(save_dir="res/txt", targets=tracker.targets)

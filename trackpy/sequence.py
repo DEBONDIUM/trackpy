@@ -1,10 +1,11 @@
 # =============================================================================
 # Libraries
 # =============================================================================
-import os
+from pathlib import Path
 import re
+
 from .image import Image
-from .target import Target
+# from image import Image
 
 
 # =============================================================================
@@ -13,24 +14,28 @@ from .target import Target
 class Sequence:
     """
     Represents an ordered series of images from a folder.
-    Handles loading, natural sorting, and trajectory export.
+
+    Responsibilities:
+      - discover and sort image files (natural sort: img_2 before img_10)
+      - expose the ordered list of Image objects (paths only, no pixel data)
+      - provide total count
     """
 
     SUPPORTED_EXTENSIONS = {".tif", ".tiff", ".png", ".jpg", ".jpeg", ".bmp"}
 
-    def __init__(self, _folder_path: str):
-        self._folder_path = _folder_path
+    def __init__(self, folder_path: Path):
+        self._folder_path = Path(folder_path)
         self._images: list[Image] = []
 
     # --- Properties ---
     @property
-    def folder_path(self) -> str:
+    def folder_path(self) -> Path:
         """Path to the image folder."""
         return self._folder_path
 
     @property
     def images(self) -> list[Image]:
-        """Ordered list of Image objects."""
+        """Ordered list of Image objects (paths only, no pixel data)."""
         return self._images
 
     @property
@@ -39,39 +44,37 @@ class Sequence:
         return len(self._images)
 
     # --- Methods ---
-    def _natural_sort_key(self, _filename: str):
-        """Natural sort key: numbers are compared numerically."""
+    def _natural_sort_key(self, filename: str) -> list:
+        """
+        Natural sort key so that img_2 sorts before img_10.
+        Splits the filename into alternating text and numeric chunks,
+        comparing numeric parts as integers rather than strings.
+        """
         return [
             int(part) if part.isdigit() else part.lower()
-            for part in re.split(r"(\d+)", _filename)
+            for part in re.split(r"(\d+)", filename)
         ]
 
     def load_all(self):
-        """Load all images from the folder in natural order."""
+        """
+        Discover all supported image files in the folder,
+        sort them in natural order, and build the Image list.
+        No pixel data is loaded at this stage.
+        """
         files = sorted(
             [
                 f
-                for f in os.listdir(self._folder_path)
-                if os.path.splitext(f)[1].lower() in self.SUPPORTED_EXTENSIONS
+                for f in self._folder_path.iterdir()
+                if f.suffix.lower() in self.SUPPORTED_EXTENSIONS
             ],
-            key=self._natural_sort_key,
+            key=lambda f: self._natural_sort_key(f.name),
         )
 
         if not files:
             raise FileNotFoundError(f"No image found in : {self._folder_path}")
 
-        self._images = [
-            Image(os.path.join(self._folder_path, f), idx)
-            for idx, f in enumerate(files)
-        ]
+        self._images = [Image(f, idx) for idx, f in enumerate(files)]
         print(f"[Sequence] {len(self._images)} images loaded from {self._folder_path}")
-
-    def export_all(self, save_dir: str, targets: list[Target]):
-        """Export trajectory of each target to a separate .txt file."""
-        os.makedirs(save_dir, exist_ok=True)
-        for target in targets:
-            path = os.path.join(save_dir, f"target_{target.id}_trajectory.txt")
-            target.export(path)
 
     def __len__(self):
         return len(self._images)
