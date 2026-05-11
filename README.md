@@ -141,7 +141,7 @@ MIT License
 
 ---
 
-## 👤 Author
+## 👤 Authors
 
 Luc Brémaud, Jérémie Girardot, Vincent Fournier
 
